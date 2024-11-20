@@ -59,7 +59,7 @@ struct p11prov_ctx {
     OSSL_ALGORITHM *op_keymgmt;
     OSSL_ALGORITHM *op_store;
 
-    pthread_rwlock_t quirk_lock;
+    P11PROV_RWLOCK quirk_lock;
     struct quirk *quirks;
     int nquirks;
 };
@@ -68,18 +68,19 @@ static struct p11prov_context_pool {
     struct p11prov_ctx **contexts;
     int num;
 
-    pthread_rwlock_t rwlock;
+    P11PROV_RWLOCK rwlock;
 } ctx_pool = {
     .contexts = NULL,
     .num = 0,
-    .rwlock = PTHREAD_RWLOCK_INITIALIZER,
+    .rwlock = P11PROV_RWLOCK_INITIALIZER,
 };
 
+#ifndef WIN32
 static void fork_prepare(void)
 {
     int err;
 
-    err = pthread_rwlock_rdlock(&ctx_pool.rwlock);
+    err = p11prov_rwlock_rdlock(&ctx_pool.rwlock);
     if (err != 0) {
         err = errno;
         P11PROV_debug("Can't lock contexts pool (error=%d)", err);
@@ -101,7 +102,7 @@ static void fork_parent(void)
             p11prov_slot_fork_release(ctx_pool.contexts[i]->slots);
         }
     }
-    err = pthread_rwlock_unlock(&ctx_pool.rwlock);
+    err = p11prov_rwlock_unlock(&ctx_pool.rwlock);
     if (err != 0) {
         err = errno;
         P11PROV_debug("Failed to release context pool (errno:%d)", err);
@@ -119,7 +120,7 @@ static void fork_child(void)
     /* This is running in the fork handler, so there should be no
      * way to have other threads running, but just in case some
      * crazy library creates threads in their child handler */
-    err = pthread_rwlock_wrlock(&ctx_pool.rwlock);
+    err = p11prov_rwlock_wrlock(&ctx_pool.rwlock);
     if (err != 0) {
         err = errno;
         P11PROV_debug("Failed to get slots lock (errno:%d)", err);
@@ -135,19 +136,20 @@ static void fork_child(void)
         }
     }
 
-    err = pthread_rwlock_unlock(&ctx_pool.rwlock);
+    err = p11prov_rwlock_unlock(&ctx_pool.rwlock);
     if (err != 0) {
         err = errno;
         P11PROV_debug("Failed to release context pool (errno:%d)", err);
     }
 }
+#endif /* !WIN32 */
 
 #define CTX_POOL_ALLOC 4
 static void context_add_pool(struct p11prov_ctx *ctx)
 {
     int err;
     /* init static pool for atfork/atexit handling */
-    err = pthread_rwlock_wrlock(&ctx_pool.rwlock);
+    err = p11prov_rwlock_wrlock(&ctx_pool.rwlock);
     if (err != 0) {
         /* just warn */
         err = errno;
@@ -164,7 +166,12 @@ static void context_add_pool(struct p11prov_ctx *ctx)
             P11PROV_raise(ctx, CKR_HOST_MEMORY, "Failed to alloc ctx pool");
             goto done;
         }
+#ifndef WIN32
         err = pthread_atfork(fork_prepare, fork_parent, fork_child);
+#else
+        /* There's no fork on windows */
+        err = 0;
+#endif
         if (err != 0) {
             /* just warn, nothing much we can do */
             P11PROV_raise(ctx, CKR_GENERAL_ERROR,
@@ -189,7 +196,7 @@ static void context_add_pool(struct p11prov_ctx *ctx)
 
 done:
     /* ------------------------------------------------- WRLOCKED */
-    (void)pthread_rwlock_unlock(&ctx_pool.rwlock);
+    (void)p11prov_rwlock_unlock(&ctx_pool.rwlock);
     return;
 }
 
@@ -199,7 +206,7 @@ static void context_rm_pool(struct p11prov_ctx *ctx)
     int err;
 
     /* init static pool for atfork/atexit handling */
-    err = pthread_rwlock_wrlock(&ctx_pool.rwlock);
+    err = p11prov_rwlock_wrlock(&ctx_pool.rwlock);
     if (err != 0) {
         /* just warn */
         err = errno;
@@ -235,7 +242,7 @@ static void context_rm_pool(struct p11prov_ctx *ctx)
     }
 
     /* ------------------------------------------------- WRLOCKED */
-    (void)pthread_rwlock_unlock(&ctx_pool.rwlock);
+    (void)p11prov_rwlock_unlock(&ctx_pool.rwlock);
     return;
 }
 
@@ -255,7 +262,7 @@ CK_RV p11prov_ctx_get_quirk(P11PROV_CTX *ctx, CK_SLOT_ID id, const char *name,
     int lock;
     CK_RV ret;
 
-    lock = pthread_rwlock_rdlock(&ctx->quirk_lock);
+    lock = p11prov_rwlock_rdlock(&ctx->quirk_lock);
     if (lock != 0) {
         ret = CKR_CANT_LOCK;
         P11PROV_raise(ctx, ret, "Failure to rdlock! (%d)", errno);
@@ -296,7 +303,7 @@ CK_RV p11prov_ctx_get_quirk(P11PROV_CTX *ctx, CK_SLOT_ID id, const char *name,
     ret = CKR_OK;
 
 done:
-    lock = pthread_rwlock_unlock(&ctx->quirk_lock);
+    lock = p11prov_rwlock_unlock(&ctx->quirk_lock);
     if (lock != 0) {
         P11PROV_raise(ctx, CKR_CANT_LOCK, "Failure to unlock! (%d)", errno);
         /* we do not return an error in this case, as we got the info */
@@ -344,7 +351,7 @@ CK_RV p11prov_ctx_set_quirk(P11PROV_CTX *ctx, CK_SLOT_ID id, const char *name,
         memcpy(_data, data, _size);
     }
 
-    lock = pthread_rwlock_wrlock(&ctx->quirk_lock);
+    lock = p11prov_rwlock_wrlock(&ctx->quirk_lock);
     if (lock != 0) {
         ret = CKR_CANT_LOCK;
         P11PROV_raise(ctx, ret, "Failure to wrlock! (%d)", errno);
@@ -395,7 +402,7 @@ CK_RV p11prov_ctx_set_quirk(P11PROV_CTX *ctx, CK_SLOT_ID id, const char *name,
 
 done:
     P11PROV_debug("Set quirk '%s' of size %lu", name, size);
-    lock = pthread_rwlock_unlock(&ctx->quirk_lock);
+    lock = p11prov_rwlock_unlock(&ctx->quirk_lock);
     if (lock != 0) {
         P11PROV_raise(ctx, CKR_CANT_LOCK, "Failure to unlock! (%d)", errno);
         /* we do not return an error in this case, as we got the info */
@@ -558,7 +565,7 @@ static void p11prov_ctx_free(P11PROV_CTX *ctx)
     p11prov_module_free(ctx->module);
     ctx->module = NULL;
 
-    ret = pthread_rwlock_wrlock(&ctx->quirk_lock);
+    ret = p11prov_rwlock_wrlock(&ctx->quirk_lock);
     if (ret != 0) {
         P11PROV_raise(ctx, CKR_CANT_LOCK,
                       "Failure to wrlock! Data corruption may happen (%d)",
@@ -576,14 +583,14 @@ static void p11prov_ctx_free(P11PROV_CTX *ctx)
         OPENSSL_free(ctx->quirks);
     }
 
-    ret = pthread_rwlock_unlock(&ctx->quirk_lock);
+    ret = p11prov_rwlock_unlock(&ctx->quirk_lock);
     if (ret != 0) {
         P11PROV_raise(ctx, CKR_CANT_LOCK,
                       "Failure to unlock! Data corruption may happen (%d)",
                       errno);
     }
 
-    ret = pthread_rwlock_destroy(&ctx->quirk_lock);
+    ret = p11prov_rwlock_destroy(&ctx->quirk_lock);
     if (ret != 0) {
         P11PROV_raise(ctx, CKR_CANT_LOCK,
                       "Failure to free lock! Data corruption may happen (%d)",
@@ -1464,7 +1471,7 @@ int OSSL_provider_init(const OSSL_CORE_HANDLE *handle, const OSSL_DISPATCH *in,
     }
     ctx->handle = handle;
 
-    ret = pthread_rwlock_init(&ctx->quirk_lock, NULL);
+    ret = p11prov_rwlock_init(&ctx->quirk_lock);
     if (ret != 0) {
         ret = errno;
         P11PROV_debug("rwlock init failed (%d)", ret);

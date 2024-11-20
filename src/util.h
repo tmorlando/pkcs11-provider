@@ -79,16 +79,22 @@ char *p11prov_alloc_sprintf(int size_hint, const char *format, ...);
 void trim_padded_field(CK_UTF8CHAR *field, ssize_t n);
 #define trim(x) trim_padded_field(x, sizeof(x))
 
-CK_RV p11prov_mutex_init(P11PROV_CTX *provctx, pthread_mutex_t *lock,
+#include <pthread.h>
+
+#define P11PROV_MUTEX pthread_mutex_t
+#define P11PROV_RWLOCK pthread_rwlock_t
+#define P11PROV_RWLOCK_INITIALIZER PTHREAD_RWLOCK_INITIALIZER
+
+CK_RV p11prov_mutex_init(P11PROV_CTX *provctx, P11PROV_MUTEX *lock,
                          const char *obj, const char *file, int line,
                          const char *func);
-CK_RV p11prov_mutex_lock(P11PROV_CTX *provctx, pthread_mutex_t *lock,
+CK_RV p11prov_mutex_lock(P11PROV_CTX *provctx, P11PROV_MUTEX *lock,
                          const char *obj, const char *file, int line,
                          const char *func);
-CK_RV p11prov_mutex_unlock(P11PROV_CTX *provctx, pthread_mutex_t *lock,
+CK_RV p11prov_mutex_unlock(P11PROV_CTX *provctx, P11PROV_MUTEX *lock,
                            const char *obj, const char *file, int line,
                            const char *func);
-CK_RV p11prov_mutex_destroy(P11PROV_CTX *provctx, pthread_mutex_t *lock,
+CK_RV p11prov_mutex_destroy(P11PROV_CTX *provctx, P11PROV_MUTEX *lock,
                             const char *obj, const char *file, int line,
                             const char *func);
 #define MUTEX_INIT(obj) \
@@ -104,7 +110,14 @@ CK_RV p11prov_mutex_destroy(P11PROV_CTX *provctx, pthread_mutex_t *lock,
     p11prov_mutex_destroy((obj)->provctx, &(obj)->lock, #obj, OPENSSL_FILE, \
                           OPENSSL_LINE, OPENSSL_FUNC)
 
-void p11prov_force_rwlock_reinit(pthread_rwlock_t *lock);
+
+void  p11prov_force_rwlock_reinit(P11PROV_RWLOCK *lock);
+CK_RV p11prov_rwlock_init(P11PROV_RWLOCK *lock);
+CK_RV p11prov_rwlock_trywrlock(P11PROV_RWLOCK *lock);
+CK_RV p11prov_rwlock_rdlock(P11PROV_RWLOCK *lock);
+CK_RV p11prov_rwlock_wrlock(P11PROV_RWLOCK *lock);
+CK_RV p11prov_rwlock_unlock(P11PROV_RWLOCK *lock);
+CK_RV p11prov_rwlock_destroy(P11PROV_RWLOCK *lock);
 
 static inline CK_ULONG constant_equal(CK_ULONG a, CK_ULONG b)
 {

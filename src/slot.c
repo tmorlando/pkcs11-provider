@@ -26,10 +26,7 @@ struct p11prov_slots_ctx {
     P11PROV_CTX *provctx;
     P11PROV_SLOT **slots;
     int num;
-    pthread_rwlock_t rwlock;
-
-    /* This is the first slot that can be r/w and
-     * accepts login */
+    P11PROV_RWLOCK rwlock;
     CK_SLOT_ID default_slot;
 };
 
@@ -136,7 +133,7 @@ CK_RV p11prov_init_slots(P11PROV_CTX *ctx, P11PROV_SLOTS_CTX **slots)
     }
     sctx->provctx = ctx;
 
-    err = pthread_rwlock_init(&sctx->rwlock, NULL);
+    err = p11prov_rwlock_init(&sctx->rwlock);
     if (err != 0) {
         err = errno;
         ret = CKR_CANT_LOCK;
@@ -278,9 +275,9 @@ void p11prov_slot_fork_prepare(P11PROV_SLOTS_CTX *sctx)
      * function, so falling back to a read lock to avoid deadlocks is ok
      * in the vast majority of use cases.
      */
-    err = pthread_rwlock_trywrlock(&sctx->rwlock);
+    err = p11prov_rwlock_trywrlock(&sctx->rwlock);
     if (err != 0) {
-        err = pthread_rwlock_rdlock(&sctx->rwlock);
+        err = p11prov_rwlock_rdlock(&sctx->rwlock);
         if (err != 0) {
             err = errno;
             P11PROV_debug("Failed to get slots lock (errno:%d)", err);
@@ -293,7 +290,7 @@ void p11prov_slot_fork_release(P11PROV_SLOTS_CTX *sctx)
 {
     int err;
 
-    err = pthread_rwlock_unlock(&sctx->rwlock);
+    err = p11prov_rwlock_unlock(&sctx->rwlock);
     if (err != 0) {
         err = errno;
         P11PROV_debug("Failed to release slots lock (errno:%d)", err);
@@ -311,7 +308,7 @@ void p11prov_slot_fork_reset(P11PROV_SLOTS_CTX *sctx)
     /* This is running in the fork handler, so there should be no
      * way to have other threads running, but just in case some
      * crazy library creates threads in their child handler */
-    err = pthread_rwlock_wrlock(&sctx->rwlock);
+    err = p11prov_rwlock_wrlock(&sctx->rwlock);
     if (err != 0) {
         err = errno;
         P11PROV_debug("Failed to get slots lock (errno:%d)", err);
@@ -328,7 +325,7 @@ void p11prov_slot_fork_reset(P11PROV_SLOTS_CTX *sctx)
         p11prov_obj_pool_fork_reset(slot->objects);
     }
 
-    err = pthread_rwlock_unlock(&sctx->rwlock);
+    err = p11prov_rwlock_unlock(&sctx->rwlock);
     if (err != 0) {
         err = errno;
         P11PROV_debug("Failed to release slots lock (errno:%d)", err);
@@ -342,7 +339,7 @@ void p11prov_free_slots(P11PROV_SLOTS_CTX *sctx)
     if (!sctx) {
         return;
     }
-    err = pthread_rwlock_destroy(&sctx->rwlock);
+    err = p11prov_rwlock_destroy(&sctx->rwlock);
     if (err != 0) {
         err = errno;
         P11PROV_raise(sctx->provctx, CKR_CANT_LOCK,
@@ -379,7 +376,7 @@ CK_RV p11prov_take_slots(P11PROV_CTX *ctx, P11PROV_SLOTS_CTX **slots)
         return CKR_GENERAL_ERROR;
     }
 
-    err = pthread_rwlock_rdlock(&sctx->rwlock);
+    err = p11prov_rwlock_rdlock(&sctx->rwlock);
     if (err != 0) {
         err = errno;
         P11PROV_raise(ctx, CKR_CANT_LOCK, "Failed to get slots lock (errno:%d)",
@@ -394,7 +391,7 @@ CK_RV p11prov_take_slots(P11PROV_CTX *ctx, P11PROV_SLOTS_CTX **slots)
 void p11prov_return_slots(P11PROV_SLOTS_CTX *sctx)
 {
     int err;
-    err = pthread_rwlock_unlock(&sctx->rwlock);
+    err = p11prov_rwlock_unlock(&sctx->rwlock);
     if (err != 0) {
         err = errno;
         P11PROV_raise(sctx->provctx, CKR_CANT_LOCK,

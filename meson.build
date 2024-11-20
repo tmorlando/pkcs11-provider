@@ -34,7 +34,7 @@ extra_c_args = [
   '-fdiagnostics-show-option',
 ]
 
-add_project_arguments(cc.get_supported_arguments(warning_c_args + extra_c_args),
+add_project_arguments(cc.get_supported_arguments(warning_c_args + extra_c_args + meson.get_external_property('cross_c_args', [])),
                       language: 'c')
 
 configinc = include_directories('.')
@@ -46,7 +46,8 @@ conf.set('PACKAGE_MAJOR', major_version)
 conf.set('PACKAGE_MINOR', minor_version)
 
 libcrypto = dependency('libcrypto', version: '>= 3.0.7')
-provider_path = libcrypto.get_variable(pkgconfig: 'modulesdir')
+provider_path = libcrypto.get_variable(pkgconfig: 'modulesdir', default_value: 'ossl_modules')
+
 libssl = dependency('libssl', version: '>= 3.0.7')
 
 host_system = host_machine.system()
@@ -89,4 +90,3 @@ meson.add_dist_script('scripts/clean-dist.sh')
 subdir('src')
 subdir('docs')
 subdir('tests')
-

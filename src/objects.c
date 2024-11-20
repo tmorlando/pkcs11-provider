@@ -63,7 +63,7 @@ struct p11prov_obj_pool {
     int num;
     int first_free;
 
-    pthread_mutex_t lock;
+    P11PROV_MUTEX lock;
 };
 
 CK_RV p11prov_obj_pool_init(P11PROV_CTX *ctx, CK_SLOT_ID id,

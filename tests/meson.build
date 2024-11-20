@@ -113,16 +113,22 @@ test_programs = {
   'tdigests': ['tdigests.c'],
   'treadkeys': ['treadkeys.c'],
   'tcmpkeys': ['tcmpkeys.c', 'util.c'],
-  'tfork': ['tfork.c'],
-  'pincache': ['pincache.c'],
 }
+
+if host_machine.system() != 'windows'
+  test_programs = test_programs + {
+    'pincache': ['pincache.c'],
+    'tfork': ['tfork.c'],
+  }
+endif
 
 test_executables = []
 foreach t, sources : test_programs
   t = executable(t, sources,
                  build_by_default: false,
                  include_directories: [configinc],
-                 dependencies: [libcrypto, libssl])
+                 dependencies: [libcrypto, libssl]
+                 )
   test_executables += [t]
 endforeach
 
@@ -152,6 +158,12 @@ tests = {
   'cms': {'suites': ['softokn', 'kryoptic', 'kryoptic.nss']},
   'pinlock': {'suites': ['kryoptic']},
 }
+
+if host_machine.system() != 'windows'
+  tests = tests + {
+    'fork': {'suites': ['softokn', 'softhsm', 'kryoptic']},
+  }
+endif
 
 test_wrapper = find_program('test-wrapper')
 

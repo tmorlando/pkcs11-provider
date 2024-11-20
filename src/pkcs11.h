@@ -3,6 +3,10 @@
 #ifndef _PD_PKCS11_
 #define _PD_PKCS11_
 
+#ifdef WIN32
+# pragma pack(push, 1)
+#endif
+
 #define CRYPTOKI_VERSION_MAJOR 3
 #define CRYPTOKI_VERSION_MINOR 1
 #define CRYPTOKI_VERSION_AMENDMENT 0
@@ -2406,6 +2410,10 @@ struct CK_FUNCTION_LIST {
     CK_C_CancelFunction C_CancelFunction;
     CK_C_WaitForSlotEvent C_WaitForSlotEvent;
 };
+
+#ifdef WIN32
+# pragma pack(pop)
+#endif
 
 
 #endif

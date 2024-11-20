@@ -33,6 +33,15 @@ Otherwise, you can set `CFLAGS`/`LDFLAGS`:
 
 - `CFLAGS="-I$OPENSSL_DIR/include" LDFLAGS="-L$OPENSSL_DIR/lib64" meson setup builddir`
 
+### Cross compiling for Windows x86_64 platform
+
+Install MinGW-W64 toolchain from https://www.mingw-w64.org/, then
+
+- `meson setup --cross-file x86_64-w64-mingw32.txt builddir`
+- `meson compile -C builddir`
+
+This module depends on MinGW `libwinpthread-1.dll`. Make that DLL available for the applications.
+
 ### Installation
 
 The usual command to install is:

@@ -2,7 +2,19 @@
    SPDX-License-Identifier: Apache-2.0 */
 
 #include "provider.h"
+
+#if defined(WIN32)
+#include <windows.h>
+#define dlopen(path, flags) LoadLibrary((path))
+#define dlerror() strdup("Error while loading DLL")
+#define dlsym(module, name) (void *)GetProcAddress((module), (name))
+#define dlclose(module) do {} while(0)
+typedef HINSTANCE P11PROV_DLHANDLE;
+#else
 #include <dlfcn.h>
+typedef void * P11PROV_DLHANDLE;
+#endif
+
 #include <string.h>
 
 /* Wrapper Interface on top of PKCS#11 interfaces.
@@ -16,12 +28,12 @@ struct p11prov_module_ctx {
     char *path;
     char *init_args;
 
-    void *dlhandle;
-    P11PROV_INTERFACE *interface;
+    P11PROV_DLHANDLE dlhandle;
+    P11PROV_INTERFACE *iface;
 
     CK_INFO ck_info;
 
-    pthread_mutex_t lock;
+    P11PROV_MUTEX lock;
     bool initialized;
     bool reinit;
 };
@@ -202,7 +214,7 @@ static CK_RV p11prov_interface_init(P11PROV_MODULE *mctx)
     }
     if (ret == CKR_OK) {
         populate_interface(intf, ck_interface);
-        mctx->interface = intf;
+        mctx->iface = intf;
     } else {
         OPENSSL_free(intf);
     }
@@ -345,7 +357,7 @@ P11PROV_INTERFACE *p11prov_module_get_interface(P11PROV_MODULE *mctx)
     if (!mctx) {
         return NULL;
     }
-    return mctx->interface;
+    return mctx->iface;
 }
 
 void p11prov_module_free(P11PROV_MODULE *mctx)
@@ -358,7 +370,7 @@ void p11prov_module_free(P11PROV_MODULE *mctx)
         p11prov_Finalize(mctx->provctx, NULL);
         dlclose(mctx->dlhandle);
     }
-    OPENSSL_free(mctx->interface);
+    OPENSSL_free(mctx->iface);
     OPENSSL_free(mctx->path);
     OPENSSL_free(mctx->init_args);
     OPENSSL_free(mctx);
