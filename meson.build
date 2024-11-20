@@ -34,7 +34,7 @@ extra_c_args = [
   '-fdiagnostics-show-option',
 ]
 
-add_project_arguments(cc.get_supported_arguments(warning_c_args + extra_c_args),
+add_project_arguments(cc.get_supported_arguments(warning_c_args + extra_c_args + meson.get_external_property('cross_c_args', [])),
                       language: 'c')
 
 configinc = include_directories('.')
@@ -62,6 +62,7 @@ if build_info == ''
   build_info = 'Built with OpenSSL version ' + libcrypto.version()
 endif
 conf.set_quoted('P11PROV_BUILDINFO', build_info)
+
 
 host_system = host_machine.system()
 if host_system == 'windows'
@@ -107,4 +108,3 @@ meson.add_dist_script('scripts/clean-dist.sh')
 subdir('src')
 subdir('docs')
 subdir('tests')
-

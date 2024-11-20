@@ -110,21 +110,27 @@ test_programs = {
   'tdigests': ['tdigests.c'],
   'treadkeys': ['treadkeys.c'],
   'tcmpkeys': ['tcmpkeys.c', 'util.c'],
-  'tfork': ['tfork.c', 'util.c'],
   'tpkey': ['tpkey.c', 'util.c'],
-  'pincache': ['pincache.c'],
   'ccerts': ['ccerts.c', 'util.c'],
   'tecx': ['tecx.c', 'util.c'],
   'tskey-kdf': ['tskey_kdf.c', 'util.c'],
   'taead': ['taead.c', 'util.c'],
 }
 
+if host_machine.system() != 'windows'
+  test_programs = test_programs + {
+    'pincache': ['pincache.c'],
+    'tfork': ['tfork.c'],
+  }
+endif
+
 test_executables = []
 foreach t, sources : test_programs
   t = executable(t, sources,
                  build_by_default: false,
                  include_directories: [configinc],
-                 dependencies: [libcrypto, libssl])
+                 dependencies: [libcrypto, libssl]
+                 )
   test_executables += [t]
 endforeach
 
@@ -174,6 +180,12 @@ tests = {
   'pinlock': {'suites': ['kryoptic']},
   'aead': {'suites': ['softokn', 'kryoptic', 'kryoptic.nss']},
 }
+
+if host_machine.system() != 'windows'
+  tests = tests + {
+    'fork': {'suites': ['softokn', 'softhsm', 'kryoptic']},
+  }
+endif
 
 test_wrapper = find_program('test-wrapper')
 

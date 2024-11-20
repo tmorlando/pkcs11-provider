@@ -36,6 +36,7 @@ pkcs11_provider_sources = [
   'store.c',
   'tls.c',
   'util.c',
+  'mutex.c',
 ]
 
 pkcs11_provider_map = meson.current_source_dir() / 'provider.map'
@@ -43,11 +44,13 @@ pkcs11_provider_ldflags = cc.get_supported_link_arguments([
   '-Wl,--version-script,' + pkcs11_provider_map
 ])
 
+threads = dependency('threads')
+
 pkcs11_provider = shared_module(
   'pkcs11',
   pkcs11_provider_sources,
   name_prefix: '',
-  dependencies: [libcrypto],
+  dependencies: [libcrypto, threads],
   include_directories: [configinc],
   link_depends: [pkcs11_provider_map],
   link_args: pkcs11_provider_ldflags,

@@ -37,6 +37,15 @@ A "build info" string (which can be seen via openssl list -providers -verbose) c
 by using the build_info option before compilation:
 - `meson configure -Dbuild_info="Build-Id: 123456789" builddir
 
+### Cross compiling for Windows x86_64 platform
+
+Install MinGW-W64 toolchain from https://www.mingw-w64.org/, then
+
+- `meson setup --cross-file x86_64-w64-mingw32.txt builddir`
+- `meson compile -C builddir`
+
+This module depends on MinGW `libwinpthread-1.dll`. Make that DLL available for the applications.
+
 ### Installation
 
 The usual command to install is:

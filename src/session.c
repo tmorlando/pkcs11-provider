@@ -15,7 +15,7 @@ struct p11prov_session {
     CK_STATE state;
     CK_FLAGS flags;
 
-    pthread_mutex_t lock;
+    P11PROV_MUTEX lock;
     bool in_use;
 
     p11prov_session_callback_t cb;
